@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>TikTok Login Callback</title>
+</head>
+<body>
+  <h2>Login tamamlandı</h2>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+
+    if (code) {
+      document.body.innerHTML += "<p>Auth code alındı.</p>";
+      // buradan sonra backend-ə göndərə bilərsən
+    } else {
+      document.body.innerHTML += "<p>Code tapılmadı.</p>";
+    }
+  </script>
+</body>
+</html>
