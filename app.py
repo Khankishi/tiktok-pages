@@ -4,8 +4,8 @@ from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-CLIENT_KEY = os.environ.get("awuh6fdcvxl1a5c0")
-CLIENT_SECRET = os.environ.get("xSqb3gf3pBSNMLj3Rw0FefwSFsQZTccY")
+CLIENT_KEY = os.environ.get("awo7exy72uibgh9b")
+CLIENT_SECRET = os.environ.get("ciVIdqwmd9XZ7fgPzWR6F4dOpVkV75NU")
 REDIRECT_URI = os.environ.get("TIKTOK_REDIRECT_URI")
 
 @app.route("/")
