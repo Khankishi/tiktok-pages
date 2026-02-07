@@ -288,7 +288,7 @@
         <div class="logo"></div>
         <div>
           <h1>POS / Cədvəl Proqramı</h1>
-          <small>Reklam saytlar • Məhsullar • Satış kassa (offline, localStorage)</small>
+          <small>Reklam saytlar • Məhsullar • Satış kassa (offline, localStorage + GitHub data.json)</small>
         </div>
       </div>
 
@@ -307,6 +307,7 @@
           <strong id="viewTitle">Satış Kassa</strong>
           <div class="rowActions">
             <button class="btn" id="exportDataBtn" title="Bütün datanı JSON kimi çıxart">💾 Export JSON</button>
+            <button class="btn" id="exportGitHubBtn" title="GitHub üçün data.json endir">🧩 Export data.json</button>
             <button class="btn" id="importDataBtn">📥 Import JSON</button>
             <input id="importFile" type="file" accept="application/json" hidden>
           </div>
@@ -357,6 +358,8 @@
 
           <div class="mini">
             İpucu: PDF üçün “PDF” düyməsi print pəncərəsini açır. Oradan “Save as PDF” seçirsən.
+            <br/><br/>
+            Qeyd: GitHub-da “data.json” faylı backup üçündür. Proqram açılarkən onu oxuyur, sonra localStorage-da saxlayır.
           </div>
         </div>
       </div>
@@ -417,7 +420,7 @@
     const defaultState = () => ({
       ads: [],        // {id, name, link, createdAt}
       products: [],   // {id, image, name, barcode, searchCode, quality, duration, qty, price, about, phone, mail, whatsapp, createdAt}
-      sales: []       // {id, createdAt, items:[{productId,name,price,count,discountedPrice}], totals:{qty,total,discount,paid,change}}
+      sales: []       // {id, createdAt, items:[{productId,name,price,count}], totals:{qty,total,discount,finalTotal,paid,change}}
     });
 
     let state = loadState();
@@ -441,6 +444,24 @@
       $("#statusPill").textContent = "Yadda saxlandı ✅";
       clearTimeout(saveState._tm);
       saveState._tm = setTimeout(()=> $("#statusPill").textContent = "Hazır ✅", 900);
+    }
+
+    // Load backup from GitHub "data.json" (if exists)
+    async function tryLoadFromDataJson(){
+      try{
+        const res = await fetch("data.json", { cache: "no-store" });
+        if(!res.ok) return false;
+        const obj = await res.json();
+        if(!obj || typeof obj !== "object") return false;
+        obj.ads ??= [];
+        obj.products ??= [];
+        obj.sales ??= [];
+        state = obj;
+        saveState(); // keep offline
+        return true;
+      }catch{
+        return false;
+      }
     }
 
     function wipeAll(){
@@ -506,6 +527,17 @@
       a.click();
       URL.revokeObjectURL(a.href);
       toast("Export edildi");
+    });
+
+    // NEW: Export as data.json for GitHub upload
+    $("#exportGitHubBtn").addEventListener("click", ()=>{
+      const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "data.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast("data.json endirildi (GitHub-a yüklə) ✅");
     });
 
     $("#importDataBtn").addEventListener("click", ()=> $("#importFile").click());
@@ -1567,7 +1599,11 @@
     }
 
     // -------------------- Init --------------------
-    go("pos");
+    (async ()=>{
+      const loaded = await tryLoadFromDataJson();
+      if(loaded) toast("GitHub data.json yükləndi ✅");
+      go("pos");
+    })();
   </script>
 </body>
 </html>
