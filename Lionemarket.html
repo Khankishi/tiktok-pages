@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Cədvəl / POS Proqramı</title>
+  <title>LionEMarket POS (Offline)</title>
   <style>
     :root{
       --bg:#0b1220;
@@ -246,9 +246,7 @@
       line-height:1.35;
     }
 
-    .toggleWrap{
-      display:flex; align-items:center; gap:10px;
-    }
+    .toggleWrap{ display:flex; align-items:center; gap:10px; }
     .sidebar.hidden{ display:none; }
 
     .toast{
@@ -268,6 +266,43 @@
       max-width: 92vw;
     }
 
+    /* Login overlay */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.65);
+      backdrop-filter: blur(8px);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:999;
+      padding:16px;
+    }
+    .modal{
+      width:min(520px, 96vw);
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(10,16,30,.92);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .modalHead{
+      padding:14px 14px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      background: rgba(0,0,0,.22);
+    }
+    .modalBody{ padding:14px; }
+    .modalHead b{ font-size:13px; }
+    .hint{
+      padding:10px;
+      border-radius:12px;
+      border:1px dashed rgba(255,255,255,.16);
+      background: rgba(0,0,0,.15);
+      color: var(--muted);
+      font-size:12px;
+      line-height:1.4;
+    }
+
     /* Receipt (print) */
     .receipt{
       font-family: var(--mono);
@@ -279,6 +314,19 @@
     .receipt th, .receipt td{ border-bottom:1px solid #ddd; padding:8px; text-align:left; }
     .receipt .sum{ margin-top:10px; border-top:2px solid #111; padding-top:10px; }
     .receipt .sum div{ display:flex; justify-content:space-between; padding:3px 0; }
+
+    /* report mini cards */
+    .cards{ display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+    @media (max-width: 1100px){ .cards{ grid-template-columns: repeat(2, 1fr);} }
+    @media (max-width: 620px){ .cards{ grid-template-columns: 1fr;} }
+    .card{
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(0,0,0,.14);
+      border-radius:14px;
+      padding:12px;
+    }
+    .card .k{ color:var(--muted); font-size:12px; }
+    .card .v{ font-family:var(--mono); font-size:18px; font-weight:900; margin-top:6px; }
   </style>
 </head>
 <body>
@@ -287,17 +335,15 @@
       <div class="brand">
         <div class="logo"></div>
         <div>
-          <h1>POS / Cədvəl Proqramı</h1>
-          <small>Reklam saytlar • Məhsullar • Satış kassa (offline, localStorage + GitHub data.json)</small>
+          <h1>LionEMarket POS (Offline)</h1>
+          <small>Parol • Satış tarixçəsi PDF • Günlük/Aylıq hesabat • Windows .exe üçün hazır</small>
         </div>
       </div>
 
       <div class="actions">
         <span class="pill" id="statusPill">Hazır ✅</span>
-        <div class="toggleWrap">
-          <button class="btn ghost" id="toggleSideBtn">➡️ Menyu</button>
-          <button class="btn danger" id="wipeAllBtn" title="Bütün datanı sil">🧨 Reset</button>
-        </div>
+        <button class="btn" id="lockBtn" title="POS-u kilidlə">🔒 Lock</button>
+        <button class="btn danger" id="wipeAllBtn" title="Bütün datanı sil">🧨 Reset</button>
       </div>
     </div>
 
@@ -306,15 +352,13 @@
         <div class="panelHead">
           <strong id="viewTitle">Satış Kassa</strong>
           <div class="rowActions">
-            <button class="btn" id="exportDataBtn" title="Bütün datanı JSON kimi çıxart">💾 Export JSON</button>
-            <button class="btn" id="exportGitHubBtn" title="GitHub üçün data.json endir">🧩 Export data.json</button>
+            <button class="btn" id="exportDataBtn" title="Backup üçün data.json endir">💾 Backup (data.json)</button>
             <button class="btn" id="importDataBtn">📥 Import JSON</button>
             <input id="importFile" type="file" accept="application/json" hidden>
+            <button class="btn danger" id="logoutBtn" title="Çıxış">🚪 Logout</button>
           </div>
         </div>
-        <div class="panelBody" id="viewHost">
-          <!-- views render here -->
-        </div>
+        <div class="panelBody" id="viewHost"></div>
       </div>
 
       <div class="sidebar" id="sidebar">
@@ -356,16 +400,39 @@
             </div>
           </div>
 
+          <div class="navGroup" data-open="1">
+            <div class="navTitle">
+              <div>📊 Hesabat / Tarixçə</div>
+              <span>report</span>
+            </div>
+            <div class="navItems">
+              <button class="navBtn" data-view="sales_history">🧾 Satış tarixçəsi (PDF) <span>→</span></button>
+              <button class="navBtn" data-view="reports">📊 Günlük / Aylıq hesabat <span>→</span></button>
+              <button class="navBtn" data-view="settings">⚙️ Ayarlar (Parol) <span>→</span></button>
+            </div>
+          </div>
+
           <div class="mini">
-            İpucu: PDF üçün “PDF” düyməsi print pəncərəsini açır. Oradan “Save as PDF” seçirsən.
+            Qəbz/PDF: print pəncərəsi açılır → “Save as PDF”.
             <br/><br/>
-            Qeyd: GitHub-da “data.json” faylı backup üçündür. Proqram açılarkən onu oxuyur, sonra localStorage-da saxlayır.
+            Backup: “Backup(data.json)” endir → GitHub-a upload/commit (manual).
           </div>
         </div>
       </div>
     </div>
 
     <div class="toast" id="toast"></div>
+  </div>
+
+  <!-- LOGIN OVERLAY -->
+  <div class="overlay" id="authOverlay">
+    <div class="modal">
+      <div class="modalHead">
+        <b id="authTitle">🔐 POS Giriş</b>
+        <span class="tag" id="authModeTag">offline</span>
+      </div>
+      <div class="modalBody" id="authBody"></div>
+    </div>
   </div>
 
   <script>
@@ -393,18 +460,38 @@
       if(!Number.isFinite(n)) return a;
       return Math.max(a, Math.min(b, n));
     }
-    function nowStr(){
-      const d = new Date();
-      return d.toLocaleString("az-AZ");
+    function escapeHtml(s){
+      return String(s ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#39;");
+    }
+
+    function formatDateISO(d){
+      // yyyy-mm-dd
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      return `${y}-${m}-${dd}`;
+    }
+    function startOfDay(d){
+      const x = new Date(d);
+      x.setHours(0,0,0,0);
+      return x;
+    }
+    function endOfDay(d){
+      const x = new Date(d);
+      x.setHours(23,59,59,999);
+      return x;
     }
 
     // Barcode: LEM-12345678910
     function genBarcode(){
       const digits = 11;
       let s = "";
-      for(let i=0;i<digits;i++){
-        s += Math.floor(Math.random()*10);
-      }
+      for(let i=0;i<digits;i++) s += Math.floor(Math.random()*10);
       return "LEM-" + s;
     }
     // Search code: 6 digits random (example: 123456)
@@ -414,20 +501,30 @@
       return s;
     }
 
+    // -------------------- Simple SHA-256 --------------------
+    async function sha256(text){
+      const enc = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest("SHA-256", enc);
+      const arr = Array.from(new Uint8Array(buf));
+      return arr.map(b => b.toString(16).padStart(2,"0")).join("");
+    }
+
     // -------------------- Storage --------------------
-    const KEY = "pos_app_v1";
+    const KEY_DB = "pos_app_v2_db";
+    const KEY_AUTH = "pos_app_v2_auth"; // {passHash, isSetup}
+    const KEY_SESSION = "pos_app_v2_session"; // {unlockedUntil}
 
     const defaultState = () => ({
-      ads: [],        // {id, name, link, createdAt}
-      products: [],   // {id, image, name, barcode, searchCode, quality, duration, qty, price, about, phone, mail, whatsapp, createdAt}
-      sales: []       // {id, createdAt, items:[{productId,name,price,count}], totals:{qty,total,discount,finalTotal,paid,change}}
+      ads: [],
+      products: [],
+      sales: [] // {id, createdAt, items:[{productId,name,price,count}], totals:{qty,total,discount,finalTotal,paid,change}}
     });
 
     let state = loadState();
 
     function loadState(){
       try{
-        const raw = localStorage.getItem(KEY);
+        const raw = localStorage.getItem(KEY_DB);
         if(!raw) return defaultState();
         const obj = JSON.parse(raw);
         if(!obj || typeof obj !== "object") return defaultState();
@@ -440,28 +537,10 @@
       }
     }
     function saveState(){
-      localStorage.setItem(KEY, JSON.stringify(state));
+      localStorage.setItem(KEY_DB, JSON.stringify(state));
       $("#statusPill").textContent = "Yadda saxlandı ✅";
       clearTimeout(saveState._tm);
       saveState._tm = setTimeout(()=> $("#statusPill").textContent = "Hazır ✅", 900);
-    }
-
-    // Load backup from GitHub "data.json" (if exists)
-    async function tryLoadFromDataJson(){
-      try{
-        const res = await fetch("data.json", { cache: "no-store" });
-        if(!res.ok) return false;
-        const obj = await res.json();
-        if(!obj || typeof obj !== "object") return false;
-        obj.ads ??= [];
-        obj.products ??= [];
-        obj.sales ??= [];
-        state = obj;
-        saveState(); // keep offline
-        return true;
-      }catch{
-        return false;
-      }
     }
 
     function wipeAll(){
@@ -472,72 +551,17 @@
       go("pos");
       toast("Reset edildi");
     }
-
-    // -------------------- Navigation --------------------
-    const titles = {
-      pos: "Satış Kassa",
-      ads_list: "Reklam saytlar • Axtar / Redaktə / Sil",
-      ads_new: "Yeni reklam sayt",
-      product_new: "Məhsul əlavə et",
-      products_list: "Məhsullar • Axtar / Filter"
-    };
-
-    function setActiveNav(view){
-      $$(".navBtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
-      $("#viewTitle").textContent = titles[view] || "Panel";
-    }
-
-    function go(view){
-      setActiveNav(view);
-      render(view);
-    }
-
-    $$(".navBtn").forEach(btn=>{
-      btn.addEventListener("click", ()=> go(btn.dataset.view));
-    });
-
-    // group toggle
-    $$(".navTitle").forEach(title=>{
-      title.addEventListener("click", ()=>{
-        const group = title.closest(".navGroup");
-        const items = group.querySelector(".navItems");
-        const open = group.getAttribute("data-open") === "1";
-        group.setAttribute("data-open", open ? "0" : "1");
-        items.style.display = open ? "none" : "flex";
-      });
-    });
-
-    // sidebar toggles
-    function showSidebar(){ $("#sidebar").classList.remove("hidden"); $("#toggleSideBtn").textContent = "➡️ Menyu"; }
-    function hideSidebar(){ $("#sidebar").classList.add("hidden"); $("#toggleSideBtn").textContent = "⬅️ Menyu"; }
-    $("#hideSideBtn").addEventListener("click", hideSidebar);
-    $("#toggleSideBtn").addEventListener("click", ()=>{
-      const hidden = $("#sidebar").classList.contains("hidden");
-      hidden ? showSidebar() : hideSidebar();
-    });
-
     $("#wipeAllBtn").addEventListener("click", wipeAll);
 
-    // -------------------- Export/Import whole DB --------------------
+    // -------------------- Backup / Import --------------------
     $("#exportDataBtn").addEventListener("click", ()=>{
-      const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "pos_data.json";
-      a.click();
-      URL.revokeObjectURL(a.href);
-      toast("Export edildi");
-    });
-
-    // NEW: Export as data.json for GitHub upload
-    $("#exportGitHubBtn").addEventListener("click", ()=>{
       const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       a.download = "data.json";
       a.click();
       URL.revokeObjectURL(a.href);
-      toast("data.json endirildi (GitHub-a yüklə) ✅");
+      toast("data.json endirildi ✅ (backup)");
     });
 
     $("#importDataBtn").addEventListener("click", ()=> $("#importFile").click());
@@ -563,14 +587,184 @@
       }
     });
 
-    // -------------------- Ads (Reklam saytlar) --------------------
-    function adsAdd({name, link}){
-      state.ads.unshift({
-        id: uid("ad"),
-        name: (name||"").trim(),
-        link: (link||"").trim(),
-        createdAt: Date.now()
+    // -------------------- Auth (Password) --------------------
+    function getAuth(){
+      try{
+        const raw = localStorage.getItem(KEY_AUTH);
+        if(!raw) return { isSetup:false, passHash:"" };
+        const o = JSON.parse(raw);
+        return { isSetup: !!o.isSetup, passHash: String(o.passHash||"") };
+      }catch{
+        return { isSetup:false, passHash:"" };
+      }
+    }
+    function setAuth(passHash){
+      localStorage.setItem(KEY_AUTH, JSON.stringify({ isSetup:true, passHash }));
+    }
+
+    function getSession(){
+      try{
+        const raw = localStorage.getItem(KEY_SESSION);
+        if(!raw) return { unlockedUntil: 0 };
+        const o = JSON.parse(raw);
+        return { unlockedUntil: Number(o.unlockedUntil||0) };
+      }catch{
+        return { unlockedUntil: 0 };
+      }
+    }
+    function setSessionUnlocked(minutes=240){
+      const until = Date.now() + minutes*60*1000;
+      localStorage.setItem(KEY_SESSION, JSON.stringify({ unlockedUntil: until }));
+    }
+    function clearSession(){
+      localStorage.setItem(KEY_SESSION, JSON.stringify({ unlockedUntil: 0 }));
+    }
+    function isUnlocked(){
+      const s = getSession();
+      return Date.now() < s.unlockedUntil;
+    }
+
+    function showAuthOverlay(html){
+      $("#authBody").innerHTML = html;
+      $("#authOverlay").style.display = "flex";
+    }
+    function hideAuthOverlay(){
+      $("#authOverlay").style.display = "none";
+    }
+
+    async function requireAuth(force=false){
+      const auth = getAuth();
+      if(!force && auth.isSetup && isUnlocked()) return true;
+
+      if(!auth.isSetup){
+        // First-time setup
+        showAuthOverlay(`
+          <div class="hint">
+            İlk dəfə açılır. İndi POS üçün <b>admin parol</b> təyin et.
+            <br/>Bu parol olmadan POS açılmayacaq.
+          </div>
+          <div class="grid1" style="margin-top:12px;">
+            <div class="field">
+              <label>Yeni parol</label>
+              <input class="input" id="p1" type="password" placeholder="••••••••" />
+            </div>
+            <div class="field">
+              <label>Parolu təkrar yaz</label>
+              <input class="input" id="p2" type="password" placeholder="••••••••" />
+            </div>
+            <button class="btn ok" id="setPassBtn">✅ Parolu təyin et və aç</button>
+          </div>
+        `);
+
+        $("#setPassBtn").addEventListener("click", async ()=>{
+          const p1 = ($("#p1").value||"").trim();
+          const p2 = ($("#p2").value||"").trim();
+          if(p1.length < 4) return alert("Parol ən az 4 simvol olsun.");
+          if(p1 !== p2) return alert("Parollar eyni deyil.");
+          const h = await sha256(p1);
+          setAuth(h);
+          setSessionUnlocked(240);
+          hideAuthOverlay();
+          toast("Parol təyin olundu ✅");
+        });
+        return false;
+      }else{
+        // Login
+        showAuthOverlay(`
+          <div class="hint">
+            POS kilidlidir. Açmaq üçün parolu yaz.
+          </div>
+          <div class="grid1" style="margin-top:12px;">
+            <div class="field">
+              <label>Parol</label>
+              <input class="input" id="loginPass" type="password" placeholder="••••••••" />
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn ok" id="loginBtn">🔓 Aç</button>
+              <button class="btn" id="exitBtn">❌ Bağla</button>
+            </div>
+            <div class="mini">Qeyd: Səhv parol yazsan açılmayacaq.</div>
+          </div>
+        `);
+
+        $("#loginBtn").addEventListener("click", async ()=>{
+          const p = ($("#loginPass").value||"").trim();
+          const h = await sha256(p);
+          const a = getAuth();
+          if(h !== a.passHash) return alert("Parol səhvdir.");
+          setSessionUnlocked(240);
+          hideAuthOverlay();
+          toast("Açıldı ✅");
+          render(currentView);
+        });
+        $("#exitBtn").addEventListener("click", ()=>{
+          // For browser: just keep locked
+          toast("POS kilidli qaldı 🔒");
+        });
+        return false;
+      }
+    }
+
+    $("#lockBtn").addEventListener("click", ()=>{
+      clearSession();
+      toast("Kilidləndi 🔒");
+      requireAuth(true);
+    });
+    $("#logoutBtn").addEventListener("click", ()=>{
+      clearSession();
+      toast("Çıxış edildi 🚪");
+      requireAuth(true);
+    });
+
+    // -------------------- Navigation --------------------
+    const titles = {
+      pos: "Satış Kassa",
+      ads_list: "Reklam saytlar • Axtar / Redaktə / Sil",
+      ads_new: "Yeni reklam sayt",
+      product_new: "Məhsul əlavə et",
+      products_list: "Məhsullar • Axtar / Filter",
+      sales_history: "Satış tarixçəsi • PDF export",
+      reports: "Günlük / Aylıq hesabat",
+      settings: "Ayarlar • Parol"
+    };
+
+    let currentView = "pos";
+
+    function setActiveNav(view){
+      $$(".navBtn").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+      $("#viewTitle").textContent = titles[view] || "Panel";
+    }
+
+    async function go(view){
+      currentView = view;
+      setActiveNav(view);
+      const ok = await requireAuth(false);
+      if(!ok) return; // locked
+      render(view);
+    }
+
+    $$(".navBtn").forEach(btn=>{
+      btn.addEventListener("click", ()=> go(btn.dataset.view));
+    });
+
+    // group toggle
+    $$(".navTitle").forEach(title=>{
+      title.addEventListener("click", ()=>{
+        const group = title.closest(".navGroup");
+        const items = group.querySelector(".navItems");
+        const open = group.getAttribute("data-open") === "1";
+        group.setAttribute("data-open", open ? "0" : "1");
+        items.style.display = open ? "none" : "flex";
       });
+    });
+
+    // sidebar hide/show
+    function hideSidebar(){ $("#sidebar").classList.add("hidden"); }
+    $("#hideSideBtn").addEventListener("click", hideSidebar);
+
+    // -------------------- Ads --------------------
+    function adsAdd({name, link}){
+      state.ads.unshift({ id: uid("ad"), name:(name||"").trim(), link:(link||"").trim(), createdAt: Date.now() });
       saveState();
     }
     function adsUpdate(id, patch){
@@ -584,7 +778,7 @@
       saveState();
     }
 
-    // -------------------- Products (Məhsullar) --------------------
+    // -------------------- Products --------------------
     const QUALITY = [
       "Standard with ads (1080p)",
       "Standard (1080p)",
@@ -611,7 +805,6 @@
       });
       saveState();
     }
-
     function productUpdate(id, patch){
       const x = state.products.find(p=>p.id===id);
       if(!x) return;
@@ -620,13 +813,11 @@
       if("price" in patch) x.price = clamp(x.price, 0, 100000000);
       saveState();
     }
-
     function productDelete(id){
       if(!confirm("Məhsul silinsin?")) return;
       state.products = state.products.filter(p=>p.id!==id);
       saveState();
     }
-
     function findProductByAny(query){
       const q = (query||"").trim().toLowerCase();
       if(!q) return [];
@@ -639,54 +830,34 @@
     }
 
     // -------------------- POS Cart --------------------
-    let cart = {
-      selectedProductId: null,
-      selectedCount: 1,
-      items: new Map(), // productId -> count
-      discount: 0,
-      paid: 0
-    };
-
-    function cartReset(){
-      cart = { selectedProductId:null, selectedCount:1, items:new Map(), discount:0, paid:0 };
-    }
-
+    let cart = { selectedProductId:null, items:new Map(), discount:0, paid:0 };
+    function cartReset(){ cart = { selectedProductId:null, items:new Map(), discount:0, paid:0 }; }
     function cartAdd(productId, count){
       const p = state.products.find(x=>x.id===productId);
       if(!p) return toast("Məhsul tapılmadı");
       count = clamp(count, 1, 1000000);
-
-      // stock check
       const existing = cart.items.get(productId) || 0;
       const totalWanted = existing + count;
       if(totalWanted > p.qty){
         return alert(`Stok çatmır. Mövcud stok: ${p.qty}\nSəbətdə olan: ${existing}\nİstədiyin əlavə: ${count}`);
       }
-
       cart.items.set(productId, totalWanted);
       toast("Səbətə əlavə edildi");
     }
-
-    function cartRemove(productId){
-      cart.items.delete(productId);
-    }
-
+    function cartRemove(productId){ cart.items.delete(productId); }
     function cartTotals(){
       let totalQty = 0;
       let total = 0;
-
       for(const [pid, count] of cart.items.entries()){
         const p = state.products.find(x=>x.id===pid);
         if(!p) continue;
         totalQty += count;
         total += (Number(p.price)||0) * count;
       }
-
       const discount = clamp(cart.discount, 0, 100000000);
       const finalTotal = Math.max(0, total - discount);
       const paid = clamp(cart.paid, 0, 100000000);
       const change = Math.max(0, paid - finalTotal);
-
       return { totalQty, total, discount, finalTotal, paid, change };
     }
 
@@ -695,26 +866,17 @@
       for(const [pid, count] of cart.items.entries()){
         const p = state.products.find(x=>x.id===pid);
         if(!p) continue;
-        itemsArr.push({
-          productId: pid,
-          name: p.name,
-          price: Number(p.price)||0,
-          count
-        });
+        itemsArr.push({ productId: pid, name: p.name, price: Number(p.price)||0, count });
       }
-      if(itemsArr.length === 0){
-        return alert("Səbət boşdur.");
-      }
+      if(itemsArr.length === 0) return alert("Səbət boşdur.");
 
       const totals = cartTotals();
 
-      // reduce stock
+      // stock check then reduce
       for(const it of itemsArr){
         const p = state.products.find(x=>x.id===it.productId);
         if(!p) continue;
-        if(it.count > p.qty){
-          return alert(`Stok dəyişib! "${p.name}" üçün stok çatmır. Mövcud: ${p.qty}`);
-        }
+        if(it.count > p.qty) return alert(`Stok dəyişib! "${p.name}" üçün stok çatmır. Mövcud: ${p.qty}`);
       }
       for(const it of itemsArr){
         const p = state.products.find(x=>x.id===it.productId);
@@ -735,16 +897,12 @@
           change: totals.change
         }
       };
-
       state.sales.unshift(sale);
       saveState();
 
-      // reset cart
       const receiptHtml = renderReceiptHTML(sale);
       cartReset();
       toast("Satış tamamlandı ✅");
-
-      // return sale + receipt
       return { sale, receiptHtml };
     }
 
@@ -776,9 +934,7 @@
                 <th>Toplam</th>
               </tr>
             </thead>
-            <tbody>
-              ${rows}
-            </tbody>
+            <tbody>${rows}</tbody>
           </table>
 
           <div class="sum">
@@ -795,7 +951,7 @@
       `;
     }
 
-    function openPrintWindow(html, title="Qəbz"){
+    function openPrintWindow(html, title="PDF / Qəbz"){
       const w = window.open("", "_blank");
       if(!w) return alert("Pop-up bloklanıb. Brauzerdə pop-up icazəsi ver.");
       w.document.open();
@@ -808,91 +964,158 @@
             <title>${escapeHtml(title)}</title>
             <style>
               body{ font-family: ui-monospace, Menlo, Consolas, monospace; padding:18px; }
-              .receipt{ max-width:700px; margin:0 auto; }
+              .wrap{ max-width:900px; margin:0 auto; }
               h2{ margin:0 0 8px 0; }
               .muted{ color:#444; font-size:12px; }
               table{ width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
               th,td{ border-bottom:1px solid #ddd; padding:8px; text-align:left; }
               .sum{ margin-top:10px; border-top:2px solid #111; padding-top:10px; }
               .sum div{ display:flex; justify-content:space-between; padding:3px 0; }
-              @media print{
-                button{ display:none !important; }
-              }
+              @media print{ button{ display:none !important; } }
               .bar{ display:flex; gap:10px; justify-content:flex-end; margin:0 0 10px 0; }
               button{ padding:10px 12px; border-radius:10px; border:1px solid #ccc; cursor:pointer; }
             </style>
           </head>
           <body>
             <div class="bar">
-              <button onclick="window.print()">Çap et / PDF</button>
+              <button onclick="window.print()">Çap et / Save as PDF</button>
               <button onclick="window.close()">Bağla</button>
             </div>
-            ${html}
+            <div class="wrap">${html}</div>
           </body>
         </html>
       `);
       w.document.close();
     }
 
-    function escapeHtml(s){
-      return String(s ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#39;");
+    // -------------------- Reports helpers --------------------
+    function filterSalesByRange(fromMs, toMs){
+      return state.sales.filter(s => s.createdAt >= fromMs && s.createdAt <= toMs);
+    }
+    function sumSales(sales){
+      let countSales = sales.length;
+      let qty = 0;
+      let total = 0;
+      let discount = 0;
+      let finalTotal = 0;
+
+      const productMap = new Map(); // name -> qty
+      for(const s of sales){
+        qty += Number(s.totals?.qty || 0);
+        total += Number(s.totals?.total || 0);
+        discount += Number(s.totals?.discount || 0);
+        finalTotal += Number(s.totals?.finalTotal || 0);
+
+        for(const it of (s.items||[])){
+          const nm = it.name || "???";
+          const q = Number(it.count||0);
+          productMap.set(nm, (productMap.get(nm)||0) + q);
+        }
+      }
+
+      // top product
+      let topName = "-";
+      let topQty = 0;
+      for(const [nm, q] of productMap.entries()){
+        if(q > topQty){ topQty = q; topName = nm; }
+      }
+
+      return { countSales, qty, total, discount, finalTotal, topName, topQty };
+    }
+
+    function historyPrintHTML(sales, rangeTitle){
+      const rows = sales.map(s=>{
+        return `
+          <tr>
+            <td>${new Date(s.createdAt).toLocaleString("az-AZ")}</td>
+            <td>${escapeHtml(s.id)}</td>
+            <td>${s.totals.qty}</td>
+            <td>${fmtMoney(s.totals.total)}</td>
+            <td>${fmtMoney(s.totals.discount)}</td>
+            <td>${fmtMoney(s.totals.finalTotal)}</td>
+          </tr>
+        `;
+      }).join("") || `<tr><td colspan="6" class="muted">Satış yoxdur.</td></tr>`;
+
+      const sum = sumSales(sales);
+      return `
+        <div class="receipt">
+          <h2>Satış Tarixçəsi (PDF)</h2>
+          <div class="muted">${escapeHtml(rangeTitle)}</div>
+          <br/>
+          <table>
+            <thead>
+              <tr>
+                <th>Tarix</th>
+                <th>Satış ID</th>
+                <th>Məhsul sayı</th>
+                <th>Toplam</th>
+                <th>Endirim</th>
+                <th>Ödəniləcək</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+
+          <div class="sum">
+            <div><b>Satış sayı</b> <b>${sum.countSales}</b></div>
+            <div><span>Toplam Məhsul</span> <b>${sum.qty}</b></div>
+            <div><span>Cəmi Toplam</span> <b>${fmtMoney(sum.total)}</b></div>
+            <div><span>Cəmi Endirim</span> <b>${fmtMoney(sum.discount)}</b></div>
+            <div><span>Cəmi Ödəniləcək</span> <b>${fmtMoney(sum.finalTotal)}</b></div>
+            <div><span>Top məhsul</span> <b>${escapeHtml(sum.topName)} (${sum.topQty})</b></div>
+          </div>
+        </div>
+      `;
     }
 
     // -------------------- Views --------------------
     function render(view){
       const host = $("#viewHost");
       host.innerHTML = "";
+
       if(view === "ads_list") host.appendChild(viewAdsList());
       else if(view === "ads_new") host.appendChild(viewAdsNew());
       else if(view === "product_new") host.appendChild(viewProductNew());
       else if(view === "products_list") host.appendChild(viewProductsList());
+      else if(view === "sales_history") host.appendChild(viewSalesHistory());
+      else if(view === "reports") host.appendChild(viewReports());
+      else if(view === "settings") host.appendChild(viewSettings());
       else host.appendChild(viewPOS());
     }
 
-    // ---- Ads list (search/edit/delete)
+    // ---- Ads list
     function viewAdsList(){
       const wrap = document.createElement("div");
       wrap.className = "grid1";
-
-      const top = document.createElement("div");
-      top.className = "grid2";
-      top.innerHTML = `
-        <div class="field">
-          <label>Axtar</label>
-          <input class="input" id="adsSearch" placeholder="ad və ya link..." />
-        </div>
-        <div class="field">
-          <label>Tez əməl</label>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <button class="btn primary" id="goAdsNew">＋ Yeni reklam sayt</button>
+      wrap.innerHTML = `
+        <div class="grid2">
+          <div class="field">
+            <label>Axtar</label>
+            <input class="input" id="adsSearch" placeholder="ad və ya link..." />
+          </div>
+          <div class="field">
+            <label>Tez əməl</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn primary" id="goAdsNew">＋ Yeni reklam sayt</button>
+            </div>
           </div>
         </div>
-      `;
-      wrap.appendChild(top);
 
-      const table = document.createElement("div");
-      table.className = "tableWrap";
-      table.innerHTML = `
-        <table>
-          <thead>
-            <tr>
-              <th>Ad</th>
-              <th>Link</th>
-              <th>Tarix</th>
-              <th>Əməliyyat</th>
-            </tr>
-          </thead>
-          <tbody id="adsTbody"></tbody>
-        </table>
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ad</th>
+                <th>Link</th>
+                <th>Tarix</th>
+                <th>Əməliyyat</th>
+              </tr>
+            </thead>
+            <tbody id="adsTbody"></tbody>
+          </table>
+        </div>
       `;
-      wrap.appendChild(table);
-
-      $("#viewHost")?.appendChild(wrap);
 
       wrap.querySelector("#goAdsNew").addEventListener("click", ()=> go("ads_new"));
 
@@ -906,10 +1129,7 @@
         const tb = wrap.querySelector("#adsTbody");
         tb.innerHTML = rows.map(a=>`
           <tr>
-            <td>
-              <b>${escapeHtml(a.name||"")}</b>
-              <small>ID: ${a.id}</small>
-            </td>
+            <td><b>${escapeHtml(a.name||"")}</b><small>ID: ${escapeHtml(a.id)}</small></td>
             <td>
               <a href="${escapeHtml(a.link||"#")}" target="_blank" rel="noreferrer" style="color: var(--accent2); text-decoration:none;">
                 ${escapeHtml(a.link||"")}
@@ -923,9 +1143,7 @@
               </div>
             </td>
           </tr>
-        `).join("") || `
-          <tr><td colspan="4" class="mini" style="padding:14px;">Heç nə tapılmadı.</td></tr>
-        `;
+        `).join("") || `<tr><td colspan="4" class="mini" style="padding:14px;">Heç nə tapılmadı.</td></tr>`;
 
         tb.querySelectorAll("button[data-act]").forEach(btn=>{
           const id = btn.dataset.id;
@@ -934,9 +1152,8 @@
             if(act === "del"){
               if(!confirm("Reklam saytı silinsin?")) return;
               adsDelete(id);
-              draw();
-              toast("Silindi");
-            }else if(act === "edit"){
+              draw(); toast("Silindi");
+            }else{
               const a = state.ads.find(x=>x.id===id);
               if(!a) return;
               const name = prompt("Ad (redaktə):", a.name || "");
@@ -944,13 +1161,11 @@
               const link = prompt("Link (redaktə):", a.link || "");
               if(link === null) return;
               adsUpdate(id, {name: name.trim(), link: link.trim()});
-              draw();
-              toast("Redaktə olundu");
+              draw(); toast("Redaktə olundu");
             }
           });
         });
       }
-
       wrap.querySelector("#adsSearch").addEventListener("input", draw);
       draw();
       return wrap;
@@ -960,7 +1175,6 @@
     function viewAdsNew(){
       const wrap = document.createElement("div");
       wrap.className = "grid1";
-
       wrap.innerHTML = `
         <div class="grid2">
           <div class="field">
@@ -972,17 +1186,11 @@
             <input class="input" id="adLink" placeholder="məs: https://example.com" />
           </div>
         </div>
-
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn ok" id="adSave">✅ Yadda saxla</button>
           <button class="btn" id="adBack">⬅️ Siyahıya qayıt</button>
         </div>
-
-        <div class="mini">
-          Qeyd: əlavə etdiyin saytlar “Reklam saytlar” siyahısında görünəcək (axtar / redaktə / sil).
-        </div>
       `;
-
       wrap.querySelector("#adBack").addEventListener("click", ()=> go("ads_list"));
       wrap.querySelector("#adSave").addEventListener("click", ()=>{
         const name = (wrap.querySelector("#adName").value||"").trim();
@@ -993,7 +1201,6 @@
         toast("Əlavə edildi");
         go("ads_list");
       });
-
       return wrap;
     }
 
@@ -1001,9 +1208,6 @@
     function viewProductNew(){
       const wrap = document.createElement("div");
       wrap.className = "grid1";
-
-      const barcode = genBarcode();
-      const searchAuto = genSearchCode();
 
       wrap.innerHTML = `
         <div class="grid2">
@@ -1021,7 +1225,7 @@
           <div class="field">
             <label>Barkod (random LEM-...)</label>
             <div style="display:flex; gap:10px;">
-              <input class="input" id="pBarcode" value="${barcode}" />
+              <input class="input" id="pBarcode" value="${genBarcode()}" />
               <button class="btn" id="regenBarcode">🔁</button>
             </div>
           </div>
@@ -1031,32 +1235,19 @@
             <div style="display:flex; gap:10px; align-items:center;">
               <input class="input" id="pSearch" placeholder="manual: 123456" />
               <button class="btn" id="autoSearch">🎲 Avto</button>
-              <span class="tag">Avto misal: <b id="autoHint">${searchAuto}</b></span>
+              <span class="tag">Avto misal: <b id="autoHint">${genSearchCode()}</b></span>
             </div>
-            <div class="mini">Manual yaz (məs: 123456) və ya “Avto” bas.</div>
           </div>
         </div>
 
         <div class="grid2">
-          <div class="field">
-            <label>Keyfiyyət</label>
-            <select id="pQuality"></select>
-          </div>
-          <div class="field">
-            <label>Müddət</label>
-            <select id="pDuration"></select>
-          </div>
+          <div class="field"><label>Keyfiyyət</label><select id="pQuality"></select></div>
+          <div class="field"><label>Müddət</label><select id="pDuration"></select></div>
         </div>
 
         <div class="grid2">
-          <div class="field">
-            <label>Say (stok)</label>
-            <input class="input" id="pQty" type="number" min="0" value="1" />
-          </div>
-          <div class="field">
-            <label>Qiymət</label>
-            <input class="input" id="pPrice" type="number" min="0" step="0.01" value="0" />
-          </div>
+          <div class="field"><label>Say (stok)</label><input class="input" id="pQty" type="number" min="0" value="1" /></div>
+          <div class="field"><label>Qiymət</label><input class="input" id="pPrice" type="number" min="0" step="0.01" value="0" /></div>
         </div>
 
         <div class="field">
@@ -1065,18 +1256,9 @@
         </div>
 
         <div class="grid3">
-          <div class="field">
-            <label>Əlaqə • Telefon</label>
-            <input class="input" id="pPhone" placeholder="+994..." />
-          </div>
-          <div class="field">
-            <label>Əlaqə • Mail</label>
-            <input class="input" id="pMail" placeholder="mail@example.com" />
-          </div>
-          <div class="field">
-            <label>Əlaqə • WhatsApp</label>
-            <input class="input" id="pWhats" placeholder="+994..." />
-          </div>
+          <div class="field"><label>Əlaqə • Telefon</label><input class="input" id="pPhone" placeholder="+994..." /></div>
+          <div class="field"><label>Əlaqə • Mail</label><input class="input" id="pMail" placeholder="mail@example.com" /></div>
+          <div class="field"><label>Əlaqə • WhatsApp</label><input class="input" id="pWhats" placeholder="+994..." /></div>
         </div>
 
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -1085,19 +1267,10 @@
         </div>
       `;
 
-      // fill selects
       const qSel = wrap.querySelector("#pQuality");
       const dSel = wrap.querySelector("#pDuration");
-      QUALITY.forEach(x=>{
-        const o = document.createElement("option");
-        o.value = x; o.textContent = x;
-        qSel.appendChild(o);
-      });
-      DURATION.forEach(x=>{
-        const o = document.createElement("option");
-        o.value = x; o.textContent = x;
-        dSel.appendChild(o);
-      });
+      QUALITY.forEach(x=>{ const o=document.createElement("option"); o.value=x; o.textContent=x; qSel.appendChild(o);});
+      DURATION.forEach(x=>{ const o=document.createElement("option"); o.value=x; o.textContent=x; dSel.appendChild(o);});
 
       wrap.querySelector("#regenBarcode").addEventListener("click", ()=>{
         wrap.querySelector("#pBarcode").value = genBarcode();
@@ -1112,15 +1285,11 @@
       wrap.querySelector("#pSave").addEventListener("click", ()=>{
         const name = (wrap.querySelector("#pName").value||"").trim();
         if(!name) return alert("Məhsul adı boş ola bilməz.");
-
-        const barcode2 = (wrap.querySelector("#pBarcode").value||"").trim() || genBarcode();
-        const searchCode = (wrap.querySelector("#pSearch").value||"").trim() || genSearchCode();
-
         productAdd({
           image: wrap.querySelector("#pImage").value,
           name,
-          barcode: barcode2,
-          searchCode,
+          barcode: (wrap.querySelector("#pBarcode").value||"").trim() || genBarcode(),
+          searchCode: (wrap.querySelector("#pSearch").value||"").trim() || genSearchCode(),
           quality: qSel.value,
           duration: dSel.value,
           qty: wrap.querySelector("#pQty").value,
@@ -1137,35 +1306,19 @@
       return wrap;
     }
 
-    // ---- Products list (search/filter/edit/delete)
+    // ---- Products list
     function viewProductsList(){
       const wrap = document.createElement("div");
       wrap.className = "grid1";
-
       wrap.innerHTML = `
         <div class="grid3">
-          <div class="field">
-            <label>Axtar</label>
-            <input class="input" id="pSearchQ" placeholder="ad / barkod / axtarış kodu..." />
-          </div>
-          <div class="field">
-            <label>Filter • Keyfiyyət</label>
-            <select id="fQuality">
-              <option value="">Hamısı</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Filter • Müddət</label>
-            <select id="fDuration">
-              <option value="">Hamısı</option>
-            </select>
-          </div>
+          <div class="field"><label>Axtar</label><input class="input" id="pSearchQ" placeholder="ad / barkod / axtarış kodu..." /></div>
+          <div class="field"><label>Filter • Keyfiyyət</label><select id="fQuality"><option value="">Hamısı</option></select></div>
+          <div class="field"><label>Filter • Müddət</label><select id="fDuration"><option value="">Hamısı</option></select></div>
         </div>
-
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
           <button class="btn primary" id="goNewProduct">＋ Məhsul əlavə et</button>
         </div>
-
         <div class="tableWrap">
           <table>
             <thead>
@@ -1185,12 +1338,8 @@
 
       const qSel = wrap.querySelector("#fQuality");
       const dSel = wrap.querySelector("#fDuration");
-      QUALITY.forEach(x=>{
-        const o = document.createElement("option"); o.value=x; o.textContent=x; qSel.appendChild(o);
-      });
-      DURATION.forEach(x=>{
-        const o = document.createElement("option"); o.value=x; o.textContent=x; dSel.appendChild(o);
-      });
+      QUALITY.forEach(x=>{ const o=document.createElement("option"); o.value=x; o.textContent=x; qSel.appendChild(o);});
+      DURATION.forEach(x=>{ const o=document.createElement("option"); o.value=x; o.textContent=x; dSel.appendChild(o);});
 
       wrap.querySelector("#goNewProduct").addEventListener("click", ()=> go("product_new"));
 
@@ -1217,7 +1366,7 @@
             </td>
             <td>
               <b>${escapeHtml(p.name)}</b>
-              <small>Barkod: ${escapeHtml(p.barcode)} • Axtarış kodu: ${escapeHtml(p.searchCode)}</small>
+              <small>Barkod: ${escapeHtml(p.barcode)} • Kod: ${escapeHtml(p.searchCode)}</small>
             </td>
             <td>
               <span class="tag">🎞 ${escapeHtml(p.quality)}</span>
@@ -1240,29 +1389,17 @@
           btn.addEventListener("click", ()=>{
             const p = state.products.find(x=>x.id===id);
             if(!p) return;
-
             if(act === "del"){
-              productDelete(id);
-              draw();
-              toast("Silindi");
-              return;
+              productDelete(id); draw(); toast("Silindi"); return;
             }
-
-            // edit (simple prompt edits)
             const newName = prompt("Ad:", p.name || "");
             if(newName === null) return;
             const newPrice = prompt("Qiymət:", String(p.price ?? 0));
             if(newPrice === null) return;
             const newQty = prompt("Stok (say):", String(p.qty ?? 0));
             if(newQty === null) return;
-
-            productUpdate(id, {
-              name: newName.trim(),
-              price: Number(newPrice),
-              qty: Number(newQty)
-            });
-            draw();
-            toast("Redaktə olundu");
+            productUpdate(id, { name: newName.trim(), price: Number(newPrice), qty: Number(newQty) });
+            draw(); toast("Redaktə olundu");
           });
         });
       }
@@ -1270,7 +1407,6 @@
       wrap.querySelector("#pSearchQ").addEventListener("input", draw);
       wrap.querySelector("#fQuality").addEventListener("change", draw);
       wrap.querySelector("#fDuration").addEventListener("change", draw);
-
       draw();
       return wrap;
     }
@@ -1279,13 +1415,12 @@
     function viewPOS(){
       const wrap = document.createElement("div");
       wrap.className = "grid1";
-
       wrap.innerHTML = `
         <div class="grid2">
           <div class="field">
-            <label>Məhsul axtar (ad / barkod / axtarış kodu)</label>
+            <label>Məhsul axtar (ad / barkod / kod)</label>
             <input class="input" id="posSearch" placeholder="məs: Netflix, LEM-..., 123456" />
-            <div class="mini">Tapılanlar aşağıda çıxacaq. Oradan “Seç✅” edib “Say” yazıb səbətə at.</div>
+            <div class="mini">Tapılanlar aşağıda çıxacaq. “Seç✅” → say → səbətə.</div>
           </div>
 
           <div class="field">
@@ -1389,16 +1524,12 @@
       const cartSummary = wrap.querySelector("#cartSummary");
       const discountInp = wrap.querySelector("#discountInp");
       const paidInp = wrap.querySelector("#paidInp");
-
       const salesBody = wrap.querySelector("#salesBody");
 
       function setSelected(productId){
         cart.selectedProductId = productId;
         const p = state.products.find(x=>x.id===productId);
-        if(!p){
-          selectedBox.textContent = "Heç nə seçilməyib.";
-          return;
-        }
+        if(!p){ selectedBox.textContent = "Heç nə seçilməyib."; return; }
         selectedBox.innerHTML = `
           <b>${escapeHtml(p.name)}</b><br/>
           <small>Barkod: ${escapeHtml(p.barcode)} • Kod: ${escapeHtml(p.searchCode)}</small><br/>
@@ -1409,32 +1540,18 @@
 
       function drawResults(){
         const q = (searchInp.value||"").trim().toLowerCase();
-        let rows = [];
-        if(q){
-          rows = findProductByAny(q);
-        }else{
-          rows = state.products.slice(0, 15); // show first items
-        }
-
+        const rows = q ? findProductByAny(q) : state.products.slice(0, 15);
         resultsTb.innerHTML = rows.map(p=>`
           <tr>
-            <td>
-              <b>${escapeHtml(p.name)}</b>
-              <small>${escapeHtml(p.barcode)} • ${escapeHtml(p.searchCode)}</small>
-            </td>
+            <td><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.barcode)} • ${escapeHtml(p.searchCode)}</small></td>
             <td><b>${fmtMoney(p.price)}</b></td>
             <td><b>${p.qty}</b></td>
-            <td>
-              <button class="btn ok" data-sel="${p.id}">Seç✅</button>
-            </td>
+            <td><button class="btn ok" data-sel="${p.id}">Seç✅</button></td>
           </tr>
         `).join("") || `<tr><td colspan="4" class="mini" style="padding:14px;">Məhsul yoxdur.</td></tr>`;
 
         resultsTb.querySelectorAll("button[data-sel]").forEach(b=>{
-          b.addEventListener("click", ()=>{
-            setSelected(b.dataset.sel);
-            toast("Seçildi");
-          });
+          b.addEventListener("click", ()=>{ setSelected(b.dataset.sel); toast("Seçildi"); });
         });
       }
 
@@ -1445,10 +1562,7 @@
           if(!p) return "";
           return `
             <tr>
-              <td>
-                <b>${escapeHtml(p.name)}</b>
-                <small>${escapeHtml(p.barcode)} • ${escapeHtml(p.searchCode)}</small>
-              </td>
+              <td><b>${escapeHtml(p.name)}</b><small>${escapeHtml(p.barcode)} • ${escapeHtml(p.searchCode)}</small></td>
               <td><b>${count}</b></td>
               <td><b>${fmtMoney(p.price)}</b></td>
               <td><button class="btn danger" data-del="${pid}">Sil</button></td>
@@ -1457,11 +1571,7 @@
         }).join("") || `<tr><td colspan="4" class="mini" style="padding:14px;">Səbət boşdur.</td></tr>`;
 
         cartBody.querySelectorAll("button[data-del]").forEach(b=>{
-          b.addEventListener("click", ()=>{
-            cartRemove(b.dataset.del);
-            drawCart();
-            drawSummary();
-          });
+          b.addEventListener("click", ()=>{ cartRemove(b.dataset.del); drawCart(); drawSummary(); });
         });
       }
 
@@ -1469,14 +1579,13 @@
         cart.discount = Number(discountInp.value||0);
         cart.paid = Number(paidInp.value||0);
         const t = cartTotals();
-
         cartSummary.innerHTML = `
           <div class="tag">Toplam məhsul sayı: <b>${t.totalQty}</b></div>
           <div class="tag">Toplam tutar: <b>${fmtMoney(t.total)}</b></div>
           <div class="tag">Endirim: <b>${fmtMoney(t.discount)}</b></div>
           <div class="tag">Ödəniləcək: <b>${fmtMoney(t.finalTotal)}</b></div>
           <div class="tag">Alınan məbləq: <b>${fmtMoney(t.paid)}</b></div>
-          <div class="tag">Qaytarılacaq məbləğ: <b>${fmtMoney(t.change)}</b></div>
+          <div class="tag">Qaytarılacaq: <b>${fmtMoney(t.change)}</b></div>
         `;
       }
 
@@ -1507,15 +1616,13 @@
         if(!pid) return alert("Əvvəl məhsul seç✅");
         const cnt = clamp(countInp.value, 1, 1000000);
         cartAdd(pid, cnt);
-        drawCart();
-        drawSummary();
+        drawCart(); drawSummary();
       });
 
       wrap.querySelector("#cartClear").addEventListener("click", ()=>{
         if(!confirm("Səbət təmizlənsin?")) return;
         cart.items.clear();
-        drawCart();
-        drawSummary();
+        drawCart(); drawSummary();
         toast("Səbət təmizləndi");
       });
 
@@ -1523,7 +1630,21 @@
       paidInp.addEventListener("input", drawSummary);
       searchInp.addEventListener("input", drawResults);
 
-      // complete sale
+      function previewCurrentCart(){
+        const itemsArr = [];
+        for(const [pid, count] of cart.items.entries()){
+          const p = state.products.find(x=>x.id===pid);
+          if(!p) continue;
+          itemsArr.push({ productId: pid, name: p.name, price: Number(p.price)||0, count });
+        }
+        if(itemsArr.length === 0) return null;
+        const t = cartTotals();
+        const saleLike = { id:"PREVIEW", createdAt: Date.now(), items: itemsArr, totals: {
+          qty: t.totalQty, total: t.total, discount: t.discount, finalTotal: t.finalTotal, paid: t.paid, change: t.change
+        }};
+        return renderReceiptHTML(saleLike);
+      }
+
       wrap.querySelector("#completeSale").addEventListener("click", ()=>{
         cart.discount = Number(discountInp.value||0);
         cart.paid = Number(paidInp.value||0);
@@ -1536,42 +1657,10 @@
 
         const res = cartConfirmAndComplete();
         if(!res) return;
-        // after complete, refresh UI
-        drawResults();
-        drawCart();
-        drawSummary();
-        drawSales();
 
-        // open receipt preview
+        drawResults(); drawCart(); drawSummary(); drawSales();
         openPrintWindow(res.receiptHtml, "Satış Qəbzi");
       });
-
-      // print / pdf (without completing)
-      function previewCurrentCart(){
-        const itemsArr = [];
-        for(const [pid, count] of cart.items.entries()){
-          const p = state.products.find(x=>x.id===pid);
-          if(!p) continue;
-          itemsArr.push({ productId: pid, name: p.name, price: Number(p.price)||0, count });
-        }
-        if(itemsArr.length === 0) return null;
-
-        const t = cartTotals();
-        const saleLike = {
-          id: "PREVIEW",
-          createdAt: Date.now(),
-          items: itemsArr,
-          totals: {
-            qty: t.totalQty,
-            total: t.total,
-            discount: t.discount,
-            finalTotal: t.finalTotal,
-            paid: t.paid,
-            change: t.change
-          }
-        };
-        return renderReceiptHTML(saleLike);
-      }
 
       wrap.querySelector("#printSale").addEventListener("click", ()=>{
         cart.discount = Number(discountInp.value||0);
@@ -1589,20 +1678,309 @@
         openPrintWindow(html, "PDF (Preview)");
       });
 
-      // init
       setSelected(cart.selectedProductId);
-      drawResults();
-      drawCart();
-      drawSummary();
-      drawSales();
+      drawResults(); drawCart(); drawSummary(); drawSales();
+      return wrap;
+    }
+
+    // ---- Sales History (PDF export)
+    function viewSalesHistory(){
+      const wrap = document.createElement("div");
+      wrap.className = "grid1";
+
+      const today = new Date();
+      const iso = formatDateISO(today);
+
+      wrap.innerHTML = `
+        <div class="grid2">
+          <div class="field">
+            <label>Başlanğıc tarix</label>
+            <input class="input" id="fromDate" type="date" value="${iso}" />
+          </div>
+          <div class="field">
+            <label>Bitmə tarixi</label>
+            <input class="input" id="toDate" type="date" value="${iso}" />
+          </div>
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn ok" id="pdfAll">📄 Seçilən aralığı PDF et</button>
+          <button class="btn" id="todayBtn">📌 Bu gün</button>
+          <button class="btn" id="monthBtn">🗓 Bu ay</button>
+        </div>
+
+        <div class="field">
+          <label>Nəticə</label>
+          <div class="mini" id="sumBox"></div>
+        </div>
+
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Tarix</th>
+                <th>Satış ID</th>
+                <th>Məhsul sayı</th>
+                <th>Toplam</th>
+                <th>Endirim</th>
+                <th>Ödəniləcək</th>
+              </tr>
+            </thead>
+            <tbody id="tb"></tbody>
+          </table>
+        </div>
+      `;
+
+      const fromEl = wrap.querySelector("#fromDate");
+      const toEl = wrap.querySelector("#toDate");
+      const tb = wrap.querySelector("#tb");
+      const sumBox = wrap.querySelector("#sumBox");
+
+      function draw(){
+        const from = startOfDay(new Date(fromEl.value));
+        const to = endOfDay(new Date(toEl.value));
+        const sales = filterSalesByRange(from.getTime(), to.getTime()).slice().sort((a,b)=>b.createdAt-a.createdAt);
+
+        const sum = sumSales(sales);
+        sumBox.innerHTML = `
+          <div class="tag">Satış sayı: <b>${sum.countSales}</b></div>
+          <div class="tag">Toplam məhsul: <b>${sum.qty}</b></div>
+          <div class="tag">Cəmi toplam: <b>${fmtMoney(sum.total)}</b></div>
+          <div class="tag">Cəmi endirim: <b>${fmtMoney(sum.discount)}</b></div>
+          <div class="tag">Cəmi ödəniləcək: <b>${fmtMoney(sum.finalTotal)}</b></div>
+          <div class="tag">Top məhsul: <b>${escapeHtml(sum.topName)} (${sum.topQty})</b></div>
+        `;
+
+        tb.innerHTML = sales.map(s=>`
+          <tr>
+            <td>${new Date(s.createdAt).toLocaleString("az-AZ")}</td>
+            <td>${escapeHtml(s.id)}</td>
+            <td><b>${s.totals.qty}</b></td>
+            <td><b>${fmtMoney(s.totals.total)}</b></td>
+            <td><b>${fmtMoney(s.totals.discount)}</b></td>
+            <td><b>${fmtMoney(s.totals.finalTotal)}</b></td>
+          </tr>
+        `).join("") || `<tr><td colspan="6" class="mini" style="padding:14px;">Satış yoxdur.</td></tr>`;
+      }
+
+      wrap.querySelector("#todayBtn").addEventListener("click", ()=>{
+        const t = new Date();
+        const v = formatDateISO(t);
+        fromEl.value = v; toEl.value = v;
+        draw();
+      });
+
+      wrap.querySelector("#monthBtn").addEventListener("click", ()=>{
+        const t = new Date();
+        const first = new Date(t.getFullYear(), t.getMonth(), 1);
+        const last = new Date(t.getFullYear(), t.getMonth()+1, 0);
+        fromEl.value = formatDateISO(first);
+        toEl.value = formatDateISO(last);
+        draw();
+      });
+
+      wrap.querySelector("#pdfAll").addEventListener("click", ()=>{
+        const from = startOfDay(new Date(fromEl.value));
+        const to = endOfDay(new Date(toEl.value));
+        const sales = filterSalesByRange(from.getTime(), to.getTime()).slice().sort((a,b)=>a.createdAt-b.createdAt);
+
+        const title = `Aralıq: ${fromEl.value} → ${toEl.value}`;
+        const html = historyPrintHTML(sales, title);
+        openPrintWindow(html, "Satış Tarixçəsi PDF");
+      });
+
+      fromEl.addEventListener("change", draw);
+      toEl.addEventListener("change", draw);
+      draw();
+      return wrap;
+    }
+
+    // ---- Reports (daily/monthly)
+    function viewReports(){
+      const wrap = document.createElement("div");
+      wrap.className = "grid1";
+
+      const t = new Date();
+      const todayISO = formatDateISO(t);
+      const monthFirst = new Date(t.getFullYear(), t.getMonth(), 1);
+      const monthLast = new Date(t.getFullYear(), t.getMonth()+1, 0);
+
+      wrap.innerHTML = `
+        <div class="grid3">
+          <div class="field">
+            <label>Rejim</label>
+            <select id="mode">
+              <option value="day">Günlük</option>
+              <option value="month">Aylıq</option>
+            </select>
+          </div>
+          <div class="field" id="dayBox">
+            <label>Gün seç</label>
+            <input class="input" id="day" type="date" value="${todayISO}" />
+          </div>
+          <div class="field" id="monthBox" style="display:none;">
+            <label>Ay seç</label>
+            <input class="input" id="month" type="month" value="${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}" />
+          </div>
+        </div>
+
+        <div class="cards" id="cards"></div>
+
+        <div class="field">
+          <label>Detallar (son satışlar)</label>
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tarix</th>
+                  <th>Satış ID</th>
+                  <th>Məhsul sayı</th>
+                  <th>Ödəniləcək</th>
+                  <th>Qəbz</th>
+                </tr>
+              </thead>
+              <tbody id="tb"></tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      const mode = wrap.querySelector("#mode");
+      const day = wrap.querySelector("#day");
+      const month = wrap.querySelector("#month");
+      const cards = wrap.querySelector("#cards");
+      const tb = wrap.querySelector("#tb");
+
+      function computeRange(){
+        if(mode.value === "day"){
+          const d = new Date(day.value);
+          return { from: startOfDay(d), to: endOfDay(d), title: `Günlük: ${day.value}` };
+        }else{
+          const [yy, mm] = month.value.split("-").map(Number);
+          const f = new Date(yy, mm-1, 1);
+          const l = new Date(yy, mm, 0);
+          return { from: startOfDay(f), to: endOfDay(l), title: `Aylıq: ${month.value}` };
+        }
+      }
+
+      function draw(){
+        const {from, to, title} = computeRange();
+        const sales = filterSalesByRange(from.getTime(), to.getTime()).slice().sort((a,b)=>b.createdAt-a.createdAt);
+        const sum = sumSales(sales);
+
+        cards.innerHTML = `
+          <div class="card"><div class="k">${escapeHtml(title)}</div><div class="v">${sum.countSales}</div><div class="k">Satış sayı</div></div>
+          <div class="card"><div class="k">Toplam məhsul</div><div class="v">${sum.qty}</div><div class="k">ədəd</div></div>
+          <div class="card"><div class="k">Cəmi endirim</div><div class="v">${fmtMoney(sum.discount)}</div><div class="k">AZN</div></div>
+          <div class="card"><div class="k">Cəmi ödəniləcək</div><div class="v">${fmtMoney(sum.finalTotal)}</div><div class="k">AZN</div></div>
+          <div class="card" style="grid-column: 1 / -1;">
+            <div class="k">Ən çox satılan</div>
+            <div class="v" style="font-size:16px;">${escapeHtml(sum.topName)} <span class="tag">(${sum.topQty} ədəd)</span></div>
+          </div>
+        `;
+
+        tb.innerHTML = sales.slice(0, 30).map(s=>`
+          <tr>
+            <td>${new Date(s.createdAt).toLocaleString("az-AZ")}</td>
+            <td>${escapeHtml(s.id)}</td>
+            <td><b>${s.totals.qty}</b></td>
+            <td><b>${fmtMoney(s.totals.finalTotal)}</b></td>
+            <td><button class="btn" data-r="${s.id}">Qəbz</button></td>
+          </tr>
+        `).join("") || `<tr><td colspan="5" class="mini" style="padding:14px;">Satış yoxdur.</td></tr>`;
+
+        tb.querySelectorAll("button[data-r]").forEach(b=>{
+          b.addEventListener("click", ()=>{
+            const s = state.sales.find(x=>x.id===b.dataset.r);
+            if(!s) return;
+            openPrintWindow(renderReceiptHTML(s), "Qəbz");
+          });
+        });
+      }
+
+      function syncModeUI(){
+        const isDay = mode.value === "day";
+        wrap.querySelector("#dayBox").style.display = isDay ? "" : "none";
+        wrap.querySelector("#monthBox").style.display = isDay ? "none" : "";
+        draw();
+      }
+
+      mode.addEventListener("change", syncModeUI);
+      day.addEventListener("change", draw);
+      month.addEventListener("change", draw);
+
+      syncModeUI();
+      return wrap;
+    }
+
+    // ---- Settings (change password)
+    function viewSettings(){
+      const wrap = document.createElement("div");
+      wrap.className = "grid1";
+
+      wrap.innerHTML = `
+        <div class="hint">
+          Buradan admin parolunu dəyişə bilərsən.
+          <br/>Qeyd: Parol unutsaq, data qalır, amma parolu sıfırlamaq üçün “Reset” etməli ola bilərsən.
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label>Köhnə parol</label>
+            <input class="input" id="oldp" type="password" placeholder="••••••••" />
+          </div>
+          <div class="field">
+            <label>Yeni parol</label>
+            <input class="input" id="newp" type="password" placeholder="••••••••" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Yeni parol (təkrar)</label>
+          <input class="input" id="newp2" type="password" placeholder="••••••••" />
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn ok" id="chg">✅ Parolu dəyiş</button>
+          <button class="btn" id="locknow">🔒 İndi lock et</button>
+        </div>
+      `;
+
+      wrap.querySelector("#locknow").addEventListener("click", ()=>{
+        clearSession();
+        requireAuth(true);
+      });
+
+      wrap.querySelector("#chg").addEventListener("click", async ()=>{
+        const auth = getAuth();
+        if(!auth.isSetup) return alert("Əvvəl parol təyin olunmayıb.");
+        const oldp = (wrap.querySelector("#oldp").value||"").trim();
+        const newp = (wrap.querySelector("#newp").value||"").trim();
+        const newp2 = (wrap.querySelector("#newp2").value||"").trim();
+        if(newp.length < 4) return alert("Yeni parol ən az 4 simvol olsun.");
+        if(newp !== newp2) return alert("Yeni parol təkrar ilə eyni deyil.");
+
+        const oldHash = await sha256(oldp);
+        if(oldHash !== auth.passHash) return alert("Köhnə parol səhvdir.");
+
+        const newHash = await sha256(newp);
+        setAuth(newHash);
+        setSessionUnlocked(240);
+        toast("Parol dəyişdi ✅");
+        wrap.querySelector("#oldp").value = "";
+        wrap.querySelector("#newp").value = "";
+        wrap.querySelector("#newp2").value = "";
+      });
+
       return wrap;
     }
 
     // -------------------- Init --------------------
     (async ()=>{
-      const loaded = await tryLoadFromDataJson();
-      if(loaded) toast("GitHub data.json yükləndi ✅");
-      go("pos");
+      await requireAuth(false);
+      if(isUnlocked()){
+        go("pos");
+      }
     })();
   </script>
 </body>
